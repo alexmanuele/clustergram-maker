@@ -1,33 +1,20 @@
-# install IN THIS ORDER:
 # Note that this is a lot faster if you use mamba instead of conda.
 
 # Recommended
 conda install mamba //from base environment
 conda create -n heatamp
 conda activate heatmap
-mamba install -c conda-forge r-rcolorbrewer
-mamba install -c r r-ape
-mamba install -c conda-forge r-heatmap3
-mamba install -c r r-gplots
-mamba install -c conda-forge r-textshape
 mamba install networkx
-mamba install -c r r-colorramps
 mamba install -c anaconda colorama
 mamba install seaborn
 mamba install -c conda-forge fuzzywuzzy
+mamba install scipy
 
 # IF you want to use conda instead of mamba:
 conda create -n heatmap
 conda activate heatmap
-conda install -c conda-forge r-rcolorbrewer
-conda install -c r r-ape
-conda install -c conda-forge r-heatmap3
-conda install -c r r-gplots
-conda install -c conda-forge r-textshape
 conda install networkx
-conda install -c r r-colorramps
 conda install -c anaconda colorama
 conda install seaborn
 conda install -c conda-forge fuzzywuzzy
-
-
+conda install scipy

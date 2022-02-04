@@ -1,7 +1,13 @@
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
 import seaborn as sns
 import networkx as nx
+#import ete3
+#import dendropy
+from scipy.cluster.hierarchy import dendrogram, linkage
+from scipy.spatial.distance import squareform
 from colorama import init, Fore, Style
 from fuzzywuzzy import fuzz, process
 import subprocess
@@ -54,18 +60,74 @@ lr_prompt = "Please enter the lower bound of the likelihood ratio:"
 p_prompt = "Please enter the upper bound of the p-value:"
 d_prompt = "Please enter the neighborhood depth (as an integer):"
 
+cmap = {
+    #Clades
+    'Type A': '#841e5a',
+    'Type B': '#f6c19f',
+    #Sampling Location
+    'Clinical Ab': '#fb9a99',
+    'Clinical UK': '#e31a1c',
+    'Wastewater Mun. Ab': '#cab2d6',
+    'Wastewater Mun. UK': '#6a3d9a',
+    'Agricultural Ab': '#b2df8a',
+    'Agricultural UK': '#33a02c',
+    'Natural Water Ab': '#1f78b4',
+    'Wastewater Agr. Ab': '#fdbf6f',
+    #Geography
+    'United Kingdom': '#9bbdff',
+    'Canada/Alberta': '#e36951',
+    #Habitat
+    'Agricultural': '#33a02c',
+    'Wastewater Mun.': '#cab2d6',
+    'Clinical': '#e31a1c',
+    'Natural Water': '#1f78b4',
+    'Wastewater Agr.': '#fdc170',
+    #Missing
+    np.nan: '#FFFFFF',
+}
+
+
+
 if __name__ == '__main__':
     cwd = os.getcwd()
 
     try:
         print("Loading main presence absence table. . .")
-        pa = pd.read_table('data/all_categories_PA.csv', sep=',')
+        pa = pd.read_table('data/all_categories_pa_new.csv',sep=',' ,index_col=0)
         print("Loading genome label informtation. . .")
-        meta = pd.read_table('data/metadata_with_clades.csv',sep=',')
-        meta.rename({'Run_accession': 'Isolate'}, axis=1,inplace=True)
-        meta.set_index('Isolate', inplace=True)
+        meta = pd.read_table('data/genome_labels.csv', sep=',', index_col=0)
+        # get colors for the genomes into a dataframe
+        genome_colors = meta.copy()
+        genome_colors.drop('Clade', axis=1, inplace=True)
+        for col in genome_colors.columns:
+            genome_colors[col] = [cmap[c] for c in genome_colors[col]]
+
+        # format a legend key for plotting
+        legend_keys = []
+        for i, col in enumerate(meta.columns):
+            legend_keys += sorted(list(meta[col].dropna().unique()))
+        legend_cmap = {k:v for k, v in cmap.items() if k in legend_keys}
+
+        # color map for presence/absence
+        pa_cmap = sns.color_palette(['#f5f5f5', '#021657'])
         print("Loading graph. This may take a moment. . .")
-        G = nx.graphml.read_graphml('./data/pagel_graph_relabelled.graphml')
+        G = nx.graphml.read_graphml('data/pagel_results_as_network_detailed.graphml')
+        print("Loading tree data This may take a moment. . .")
+        # load tree
+        #t = ete3.Tree('data/core_gene_tree_um.nwk', format=1)
+        # root tree
+        #t.set_outgroup('ehirae')
+        #print("Almost there - computing phylogenetic distance matrix. . .")
+        # Use dendropy to extract the distance matrix from the tree
+        #tree = dendropy.Tree.get(data=t.write(), schema='newick')
+        #dm = pd.DataFrame.from_records(tree.phylogenetic_distance_matrix().as_data_table()._data)
+        dm = pd.read_table('data/phylo_distance_matrix.csv', sep=',', index_col=0)
+        for genome in set(dm.index) - set(pa.index):
+            pa.loc[genome] = 0
+        # compressed distance matrix from the ultrametric tree
+        um = squareform(dm[dm.index])
+        # compute linkage for clustering
+        ultrameric_link = linkage(um)
         print("Data Loaded.")
     except:
         raise FileNotFoundError("Files must be located in a folder called ./data")
@@ -132,49 +194,69 @@ if __name__ == '__main__':
     S = filter_graph(G, gene, d, lr, p)
     print("Done. ")
 
-    print(Fore.YELLOW + "Creating presence absence table.. This will save a file to your disk." + Style.RESET_ALL)
+    print(Fore.YELLOW + "Creating presence absence table..." + Style.RESET_ALL)
     included = sort_gene_names([node for node in S.nodes])
-    pa.rename({'Isolate': "Genome_ID"}, axis=1, inplace=True)
-    pa.set_index('Genome_ID')[included].to_csv(outfile_csv, sep=',')
-    print(Fore.GREEN + "Saved csv file to", outfile_csv + Style.RESET_ALL)
+    #pa.rename({'Isolate': "Genome_ID"}, axis=1, inplace=True)
+    #pa.set_index('Genome_ID')[included].to_csv(outfile_csv, sep=',')
+    subset_pa = pa.loc[dm.index][included]
+    #print(Fore.GREEN + "Saved csv file to", outfile_csv + Style.RESET_ALL)
 
     print(Fore.YELLOW + "Saving subgraph to graphml. . ." + Style.RESET_ALL)
+    target_p = {}
+    target_lr = {}
+    feature_type = {}
+    for node in S.nodes:
+        if node == gene:
+            feature_type
+            continue
+        edge = S.edges[(node, gene)]
+        target_p[node] = edge['p']
+        target_lr[node] = edge['lr']
+    nx.set_node_attributes(S, name='target_p', values=target_p)
+    nx.set_node_attributes(S, name='target_lr', values=target_lr)
     nx.readwrite.graphml.write_graphml(S, outfile_graphml)
     print(Fore.GREEN + "Saved graphml file to {}. This file may be opened in Cytoscape.".format(outfile_graphml) + Style.RESET_ALL)
-
-    print(Fore.YELLOW + "Running R script to generate heatmap. This may take a moment." + Style.RESET_ALL)
-    command = "Rscript {0}/PA_heatmaps_script.R {0}/data/core_gene_alignment.aln.treefile {0}/{1} {0}/data/isolate_color.csv {2}".format(cwd, escape_brackets(outfile_csv), escape_brackets(heatmapfile))
-    status = subprocess.call(command, shell=True)
-    if status == 0:
-        print(Fore.GREEN + "Saved heatmap image file to {}".format(heatmapfile) + Style.RESET_ALL)
-    else:
-        print(Fore.RED + "There was a problem generating the heatmap." + Style.RESET_ALL)
-        print("Command used: {0}".format(command))
+    print(Fore.YELLOW + "Creating ClusterMap . . ." + Style.RESET_ALL)
+    title = "{} Neighborhood P/A".format(gene)
+    handles = [Patch(facecolor=legend_cmap[name]) for name in legend_cmap]
+    g = sns.clustermap(data=subset_pa.loc[dm.index],
+                       row_linkage=ultrameric_link,
+                       cbar_pos=None, row_colors=genome_colors,
+                       cmap=pa_cmap,
+                       method='complete', metric='cityblock',
+                       xticklabels=1, yticklabels=False)
+    g.ax_col_dendrogram.set_title(title)
+    plt.legend(handles, legend_cmap, title='Genome Labels',
+               bbox_to_anchor=(1, 1), bbox_transform=plt.gcf().transFigure, loc='upper left')
+    #plt.xticks(fontsize=6)
+    plt.savefig(heatmapfile, bbox_inches='tight', dpi=300)
+    print(Fore.GREEN + "Saved heatmap image file to {}".format(heatmapfile) + Style.RESET_ALL)
 
     print(Fore.YELLOW + "Making distribution plot. . ." + Style.RESET_ALL)
     sns.set_context('talk')
     sns.set_palette('Paired')
     palette = ['C3', 'C5', 'C8', 'C1', 'C0']
-    short_habs = {'Agriculture': 'AGRI',
+    short_habs = {'Agricultural': 'AGRI',
                   'Clinical': "CLIN",
                   'Natural Water': "NW",
                   'Wastewater Agr.': 'AWW',
-                  'Wastewater Human': 'MWW'}
+                  'Wastewater Mun.': 'MWW'}
     #list of genomes where query is present
-    series = pa.set_index('Genome_ID').dropna()[gene]
-    present = list(series[series != 0].index)
+    series = pa[gene]
+    present = list(series[series != 0].dropna().index)
     #count presences per habitat
     t = meta.loc[present].reset_index()[['Habitat', 'Isolate']].groupby('Habitat',dropna=False).count()
     t.reset_index(inplace=True)
     for hab in meta['Habitat'].unique():
         if hab not in t['Habitat'].unique():
-            t = t.concat({'Habitat': hab, 'Isolate':0}, ignore_index=True)
+            t = t.append({'Habitat': hab, 'Isolate':0}, ignore_index=True)
     t['Habitat'] = [short_habs[h] for h in t['Habitat']]
 
     padding = math.ceil(t['Isolate'].max() /100 * 10)
+    plt.figure()
     plt.ylim((0, t['Isolate'].max() + padding))
     t.rename({'Isolate': '# Genomes Present'},axis=1, inplace=True)
-    g = sns.barplot(data=t, x='Habitat', y='# Genomes Present', palette=palette )
+    g = sns.barplot(data=t, x='Habitat', y='# Genomes Present', palette=palette, hue_order=['AGRI', 'CLIN', 'NW', 'AWW', 'MWW'] )
     g.set_title('Frequency of {} by habitat'.format(gene))
     g.bar_label(g.containers[0], label_type='edge')
     plt.savefig(outfile_habitats, bbox_inches='tight')
