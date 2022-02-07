@@ -267,7 +267,7 @@ if __name__ == '__main__':
     plt.figure()
     plt.ylim((0, t['Isolate'].max() + padding))
     t.rename({'Isolate': '# Genomes Present'},axis=1, inplace=True)
-    g = sns.barplot(data=t, x='Habitat', y='# Genomes Present', palette=palette, order=['AGRI', 'CLIN', 'NW', 'AWW', 'MWW'] )
+    g = sns.barplot(data=t, x='Habitat', y='# Genomes Present', palette=palette, order=['AGRI', 'CLIN', 'MWW', 'AWW', 'NW'] )
     g.set_title('Frequency of {} by habitat'.format(gene))
     g.bar_label(g.containers[0], label_type='edge')
     plt.savefig(outfile_habitats, bbox_inches='tight')
