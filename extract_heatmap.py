@@ -20,12 +20,17 @@ def neighborhood(G, node, n):
     return [node for node, length in path_lengths.items()
                     if length <= n]
 def filter_graph(G, node, d, lr_threshold, p_threshold):
+    node_list = []
+    if d == 0:
+        node_list.append(node)
     edges = []
-    for u,v,e in G.edges(data=True):
+    for u,v,e in G.edges(*node_list, data=True):
         if e['lr'] >= lr_threshold and e['p'] <= p_threshold:
             edges.append((u,v))
     H=G.edge_subgraph(edges)
     if node in H.nodes:
+        if d==0:
+            return H
         return H.subgraph(neighborhood(H, node, d))
     return G.subgraph([node])
 
@@ -58,7 +63,7 @@ def check_exit(in_text):
 gene_prompt = "Please enter the name of the target gene:"
 lr_prompt = "Please enter the lower bound of the likelihood ratio:"
 p_prompt = "Please enter the upper bound of the p-value:"
-d_prompt = "Please enter the neighborhood depth (as an integer):"
+d_prompt = "Please enter the neighborhood depth (as an integer). NOTE: You may type 0 to retrieve only the edges incident on the focal node:"
 
 cmap = {
     #Clades
@@ -173,7 +178,7 @@ if __name__ == '__main__':
         try:
             d = int(d)
             assert type(d) == int
-            assert d > 0
+            assert d > -1
             degree_valid = True
         except:
             print("Degree must be a positive integer.")
@@ -204,16 +209,22 @@ if __name__ == '__main__':
     print(Fore.YELLOW + "Saving subgraph to graphml. . ." + Style.RESET_ALL)
     target_p = {}
     target_lr = {}
-    feature_type = {}
+    #feature_type = {}
+    target_log2_lr = {}
+    target_log10_lr = {}
     for node in S.nodes:
         if node == gene:
-            feature_type
+            #feature_type #Should this not be here?
             continue
         edge = S.edges[(node, gene)]
         target_p[node] = edge['p']
         target_lr[node] = edge['lr']
+        target_log2_lr[node] = max(0.000000001, np.log2(edge['lr']))
+        target_log10_lr[node] = max(0.000000001, np.log10(edge['lr']))
     nx.set_node_attributes(S, name='target_p', values=target_p)
     nx.set_node_attributes(S, name='target_lr', values=target_lr)
+    nx.set_node_attributes(S, name='target_log2_lr', values=target_log2_lr)
+    nx.set_node_attributes(S, name='target_log10_lr', values=target_log10_lr)
     nx.readwrite.graphml.write_graphml(S, outfile_graphml)
     print(Fore.GREEN + "Saved graphml file to {}. This file may be opened in Cytoscape.".format(outfile_graphml) + Style.RESET_ALL)
     print(Fore.YELLOW + "Creating ClusterMap . . ." + Style.RESET_ALL)
