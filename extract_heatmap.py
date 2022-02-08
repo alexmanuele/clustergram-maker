@@ -51,6 +51,16 @@ def escape_brackets(string):
     t = t.replace(')', '\)')
     return t
 
+def red_string(string):
+    return Fore.RED + string + Style.RESET_ALL
+
+def yellow_string(string):
+    return Fore.YELLOW + string + Style.RESET_ALL
+
+def green_string(string):
+     return Fore.GREEN + string + Style.RESET_ALL
+
+
 ## user input stuff
 #allow the user to exit anytime
 def check_exit(in_text):
@@ -97,9 +107,9 @@ if __name__ == '__main__':
     cwd = os.getcwd()
 
     try:
-        print("Loading main presence absence table. . .")
+        print(yellow_string("Loading main presence absence table. . ."))
         pa = pd.read_table('data/all_categories_pa_new.csv',sep=',' ,index_col=0)
-        print("Loading genome label informtation. . .")
+        print(yellow_string("Loading genome label informtation. . ."))
         meta = pd.read_table('data/genome_labels.csv', sep=',', index_col=0)
         # get colors for the genomes into a dataframe
         genome_colors = meta.copy()
@@ -115,17 +125,10 @@ if __name__ == '__main__':
 
         # color map for presence/absence
         pa_cmap = sns.color_palette(['#f5f5f5', '#021657'])
-        print("Loading graph. This may take a moment. . .")
+        print(yellow_string("Loading graph. This may take a moment. . ."))
         G = nx.graphml.read_graphml('data/pagel_results_as_network_detailed.graphml')
-        print("Loading tree data This may take a moment. . .")
-        # load tree
-        #t = ete3.Tree('data/core_gene_tree_um.nwk', format=1)
-        # root tree
-        #t.set_outgroup('ehirae')
-        #print("Almost there - computing phylogenetic distance matrix. . .")
-        # Use dendropy to extract the distance matrix from the tree
-        #tree = dendropy.Tree.get(data=t.write(), schema='newick')
-        #dm = pd.DataFrame.from_records(tree.phylogenetic_distance_matrix().as_data_table()._data)
+        print(yellow_string("Loading tree data This may take a moment. . ."))
+
         dm = pd.read_table('data/phylo_distance_matrix.csv', sep=',', index_col=0)
         for genome in set(dm.index) - set(pa.index):
             pa.loc[genome] = 0
@@ -133,80 +136,88 @@ if __name__ == '__main__':
         um = squareform(dm[dm.index])
         # compute linkage for clustering
         ultrameric_link = linkage(um)
-        print("Data Loaded.")
+        print(green_string("Data Loaded."))
     except:
         raise FileNotFoundError("Files must be located in a folder called ./data")
 
 
     #loop for user input
-    print("Creating your data. Please answer the questions. You may type 'exit' any time to exit.")
-    node_list = list(G.nodes)
-    target = False
-    while not target:
-        gene = check_exit(input(Fore.GREEN + gene_prompt + Style.RESET_ALL))
-        target = gene in G.nodes
-        if not target:
-            fuzzy_match = process.extract(gene, node_list, limit=3)
-            print("{} not found in the network. Please double check spelling and capitalization.".format(gene))
-            print("Did you mean:")
-            for i in fuzzy_match:
-                print(Fore.YELLOW + "\t{}".format(i[0]) + Style.RESET_ALL)
+    input_loop = True
+    while input_loop:
+        print(green_string("Creating your data. Please answer the questions. You may type 'exit' any time to exit."))
+        node_list = list(G.nodes)
+        target = False
+        while not target:
+            gene = check_exit(input(Fore.GREEN + gene_prompt + Style.RESET_ALL))
+            target = gene in G.nodes
+            if not target:
+                fuzzy_match = process.extract(gene, node_list, limit=3)
+                print(red_string("{} not found in the network. Please double check spelling and capitalization.".format(gene)))
+                print(yellow_string("Did you mean:"))
+                for i in fuzzy_match:
+                    print(yellow_string("\t{}".format(i[0])))
 
 
-    p_valid = False
-    while not p_valid:
-        p = check_exit(input(Fore.GREEN + p_prompt + Style.RESET_ALL))
-        try:
-            p = float(p)
-            assert p >= 0.0 and p <= 1.0
-            p_valid = True
-        except:
-            print("p value must be a number between 0.0 and 1.0")
+        p_valid = False
+        while not p_valid:
+            p = check_exit(input(green_string(p_prompt)))
+            try:
+                p = float(p)
+                assert p >= 0.0 and p <= 1.0
+                p_valid = True
+            except:
+                print(yellow_string("p value must be a number between 0.0 and 1.0"))
 
-    lr_valid = False
-    while not lr_valid:
-        lr = check_exit(input(Fore.GREEN + lr_prompt + Style.RESET_ALL))
-        try:
-            lr = float(lr)
-            lr_valid = True
-        except:
-            print("LR value must be numeric.")
+        lr_valid = False
+        while not lr_valid:
+            lr = check_exit(input(green_string(lr_prompt)))
+            try:
+                lr = float(lr)
+                lr_valid = True
+            except:
+                print(yellow_string("LR value must be numeric."))
 
-    degree_valid = False
-    while not degree_valid:
-        d = check_exit(input(Fore.GREEN + d_prompt + Style.RESET_ALL))
-        try:
-            d = int(d)
-            assert type(d) == int
-            assert d > -1
-            degree_valid = True
-        except:
-            print("Degree must be a positive integer.")
+        degree_valid = False
+        while not degree_valid:
+            d = check_exit(input(green_string(d_prompt)))
+            try:
+                d = int(d)
+                assert type(d) == int
+                assert d > -1
+                degree_valid = True
+            except:
+                print(yellow_string("Degree must be a positive integer."))
 
-    print("Input done. Processing. . .")
-    #make results directory
-    results_dir = 'results/{}'.format(gene)
-    if not os.path.exists('results'):
-        os.makedirs('results')
-    if not os.path.exists(results_dir):
-        os.makedirs(results_dir)
-    outfile_csv = '{0}/{1}_neighborhood_PA.csv'.format(results_dir, gene)
-    heatmapfile = '{0}/{1}_PA_Heatmap.png'.format(results_dir, gene)
-    outfile_graphml = '{0}/{1}_neighborhood_graph.graphml'.format(results_dir, gene)
-    outfile_habitats = '{0}/{1}_habitat_dist.png'.format(results_dir, gene)
+        print("Input done. Processing. . .")
+        #make results directory
+        results_dir = 'results/{}'.format(gene)
+        if not os.path.exists('results'):
+            os.makedirs('results')
+        if not os.path.exists(results_dir):
+            os.makedirs(results_dir)
+        outfile_csv = '{0}/{1}_neighborhood_PA.csv'.format(results_dir, gene)
+        heatmapfile = '{0}/{1}_PA_Heatmap.png'.format(results_dir, gene)
+        outfile_graphml = '{0}/{1}_neighborhood_graph.graphml'.format(results_dir, gene)
+        outfile_habitats = '{0}/{1}_habitat_dist.png'.format(results_dir, gene)
+        outfile_habitats2 = '{0}/{1}_habitat_dist_proportion.png'.format(results_dir, gene)
+        print("Computing subgraph. . .")
+        print("Done. ")
+        S = filter_graph(G, gene, d, lr, p)
+        if len(S.nodes) == 1:
+            print(red_string("The filtered graph contains only one node!"))
+            print(red_string("Cannot perform clustering on singleton. Please select new parameters, or type 'exit' to exit."))
+        else:
+            input_loop = False
 
-    print("Computing subgraph. . .")
-    S = filter_graph(G, gene, d, lr, p)
-    print("Done. ")
 
-    print(Fore.YELLOW + "Creating presence absence table..." + Style.RESET_ALL)
+    print(yellow_string("Creating presence absence table..."))
     included = sort_gene_names([node for node in S.nodes])
     #pa.rename({'Isolate': "Genome_ID"}, axis=1, inplace=True)
     #pa.set_index('Genome_ID')[included].to_csv(outfile_csv, sep=',')
     subset_pa = pa.loc[dm.index][included]
     #print(Fore.GREEN + "Saved csv file to", outfile_csv + Style.RESET_ALL)
 
-    print(Fore.YELLOW + "Saving subgraph to graphml. . ." + Style.RESET_ALL)
+    print(yellow_string("Saving subgraph to graphml. . ."))
     target_p = {}
     target_lr = {}
     #feature_type = {}
@@ -226,8 +237,8 @@ if __name__ == '__main__':
     nx.set_node_attributes(S, name='target_log2_lr', values=target_log2_lr)
     nx.set_node_attributes(S, name='target_log10_lr', values=target_log10_lr)
     nx.readwrite.graphml.write_graphml(S, outfile_graphml)
-    print(Fore.GREEN + "Saved graphml file to {}. This file may be opened in Cytoscape.".format(outfile_graphml) + Style.RESET_ALL)
-    print(Fore.YELLOW + "Creating ClusterMap . . ." + Style.RESET_ALL)
+    print(green_string("Saved graphml file to {}. This file may be opened in Cytoscape.".format(outfile_graphml)))
+    print(yellow_string("Creating ClusterMap . . ."))
     title = "{} Neighborhood P/A".format(gene)
     handles = [Patch(facecolor=legend_cmap[name]) for name in legend_cmap]
     g = sns.clustermap(data=subset_pa.loc[dm.index],
@@ -241,9 +252,9 @@ if __name__ == '__main__':
                bbox_to_anchor=(1, 1), bbox_transform=plt.gcf().transFigure, loc='upper left')
     #plt.xticks(fontsize=6)
     plt.savefig(heatmapfile, bbox_inches='tight', dpi=300)
-    print(Fore.GREEN + "Saved heatmap image file to {}".format(heatmapfile) + Style.RESET_ALL)
+    print(green_string("Saved heatmap image file to {}".format(heatmapfile)))
 
-    print(Fore.YELLOW + "Making distribution plot. . ." + Style.RESET_ALL)
+    print(yellow_string("Making distribution plot. . ."))
     sns.set_context('talk')
     sns.set_palette('Paired')
     palette = ['C3', 'C5', 'C8', 'C1', 'C0']
@@ -271,5 +282,15 @@ if __name__ == '__main__':
     g.set_title('Frequency of {} by habitat'.format(gene))
     g.bar_label(g.containers[0], label_type='edge')
     plt.savefig(outfile_habitats, bbox_inches='tight')
-    print(Fore.GREEN + "Saved distribution bar plot to {0}".format(outfile_habitats) + Style.RESET_ALL)
+
+    plt.figure()
+    summ = t['# Genomes Present'].sum()
+    t['Prop. Genomes Present'] = t['# Genomes Present'].map(lambda x: x/summ)
+    padding=0.1
+    plt.ylim((0, t['Prop. Genomes Present'].max() + padding))
+    g = sns.barplot(data=t, x='Habitat', y='Prop. Genomes Present', palette=palette, order=['AGRI', 'CLIN', 'MWW', 'AWW', 'NW'] )
+    g.set_title('Proportion of genomes containing {0} by habitat\n({1} total genomes)'.format(gene, summ))
+    g.bar_label(g.containers[0], labels=[int(i) if i > 0 else '' for i in g.containers[0].datavalues * summ], label_type='edge',)
+    plt.savefig(outfile_habitats2, bbox_inches='tight')
+    print(green_string("Saved distribution bar plot to {0}".format(outfile_habitats)))
     print("Done!")
