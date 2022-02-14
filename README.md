@@ -5,7 +5,7 @@ This tool contains a fully connected graph of genes in the data files, as well a
 The tool will ask you for a focal gene around which to build a network, along with thresholds to filter graph edges. It will compute the local subgraph.
 
 ## Installation
-Follow the instructions at `installation.txt`
+Follow the instructions at `install_instructions.txt`
 
 ## Usage
 ### Parameter requirements
